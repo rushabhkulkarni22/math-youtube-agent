@@ -143,9 +143,15 @@ uv run python main.py --retry-failed --limit 1
 ## Always-on hourly deployment
 
 The GitHub Actions workflow in `.github/workflows/hourly-video.yml` generates
-and uploads at most one private video per hour. Redundant ten-minute scheduler
-checks compensate for delayed or dropped GitHub cron events. It can also be started
-manually from the repository's Actions page. GitHub repository concurrency
-prevents overlapping runs, while `database/agent.db` and `input/prompts.xlsx`
-preserve upload progress between runners. Videos, logs, OAuth files, and API
-keys are excluded from Git.
+and uploads one private video when dispatched. The local
+`hourly_github_trigger.ps1` is installed in Windows Task Scheduler and dispatches
+the cloud workflow hourly, including waking the computer from sleep. GitHub
+repository concurrency and the local active-run check prevent overlapping runs.
+`database/agent.db` and `input/prompts.xlsx` preserve progress between runners.
+Videos, logs, OAuth files, and API keys are excluded from Git.
+
+Install or repair the hourly Windows trigger with:
+
+```powershell
+.\hourly_github_trigger.ps1 -Install
+```
