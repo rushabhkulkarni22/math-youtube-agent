@@ -17,6 +17,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--limit", type=int, default=1)
     parser.add_argument("--retry-failed", action="store_true")
     parser.add_argument("--authorize-youtube", action="store_true")
+    parser.add_argument(
+        "--fail-on-item-error",
+        action="store_true",
+        help="Return a failing exit code if any selected prompt fails.",
+    )
     return parser.parse_args()
 
 
@@ -51,6 +56,7 @@ def main() -> int:
         return 0
 
     limit = min(args.limit, settings.videos_per_day)
+    had_failure = False
     for _ in range(limit):
         prompt = database.next_actionable()
         if not prompt:
@@ -60,7 +66,8 @@ def main() -> int:
             pipeline.process(prompt)
         except Exception:
             logger.exception("Prompt %s failed; continuing batch", prompt["id"])
-    return 0
+            had_failure = True
+    return 1 if had_failure and args.fail_on_item_error else 0
 
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: hourly-youtube-video
@@ -49,7 +50,7 @@ jobs:
           printf '%s' "$YOUTUBE_TOKEN_JSON" > secrets/youtube_token.json
 
       - name: Generate and upload one private video
-        run: python main.py --limit 1
+        run: python main.py --limit 1 --fail-on-item-error
 
       - name: Save upload progress
         if: always()
@@ -61,3 +62,11 @@ jobs:
             git commit -m "chore: save automated video progress"
             git push
           fi
+
+      - name: Immediately queue the next prompt after failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sleep 10
+          gh workflow run hourly-video.yml --ref main

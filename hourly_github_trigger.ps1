@@ -54,7 +54,7 @@ $runsJson = & $gh run list `
     --repo $Repository `
     --workflow $Workflow `
     --limit 10 `
-    --json status
+    --json status,conclusion,updatedAt
 if ($LASTEXITCODE -ne 0) {
     Add-Content $LogPath "$timestamp ERROR: Unable to query GitHub workflow status."
     exit $LASTEXITCODE
@@ -64,6 +64,19 @@ $activeRuns = @($runs | Where-Object { $_.status -in @("queued", "in_progress") 
 if ($activeRuns -gt 0) {
     Add-Content $LogPath "$timestamp SKIPPED: A cloud workflow is already active."
     exit 0
+}
+
+$latestGreen = $runs |
+    Where-Object { $_.status -eq "completed" -and $_.conclusion -eq "success" } |
+    Sort-Object { [datetime]$_.updatedAt } -Descending |
+    Select-Object -First 1
+if ($latestGreen) {
+    $greenAge = (Get-Date).ToUniversalTime() - ([datetime]$latestGreen.updatedAt).ToUniversalTime()
+    if ($greenAge.TotalMinutes -lt 60) {
+        $remaining = [math]::Ceiling(60 - $greenAge.TotalMinutes)
+        Add-Content $LogPath "$timestamp SKIPPED: Last green workflow was less than one hour ago ($remaining minutes remaining)."
+        exit 0
+    }
 }
 
 & $gh workflow run $Workflow --repo $Repository
