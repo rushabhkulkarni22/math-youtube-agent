@@ -1,0 +1,65 @@
+name: Generate and upload one YouTube video
+
+on:
+  schedule:
+    - cron: "17 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: hourly-youtube-video
+  cancel-in-progress: false
+
+jobs:
+  generate-upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      DRY_RUN: "false"
+      YOUTUBE_PRIVACY: private
+      VIDEOS_PER_DAY: "1"
+      MANIM_QUALITY: low_quality
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install Manim and video dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ffmpeg libcairo2-dev libffi-dev libpango1.0-dev pkg-config \
+            texlive-fonts-recommended texlive-latex-base texlive-latex-extra \
+            texlive-science dvisvgm fonts-dejavu-core
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Restore encrypted application credentials
+        env:
+          YOUTUBE_CLIENT_SECRET_JSON: ${{ secrets.YOUTUBE_CLIENT_SECRET_JSON }}
+          YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
+        run: |
+          mkdir -p secrets database generated logs
+          printf '%s' "$YOUTUBE_CLIENT_SECRET_JSON" > secrets/client_secret.json
+          printf '%s' "$YOUTUBE_TOKEN_JSON" > secrets/youtube_token.json
+
+      - name: Generate and upload one private video
+        run: python main.py --limit 1
+
+      - name: Save upload progress
+        if: always()
+        run: |
+          git config user.name "youtube-video-bot"
+          git config user.email "youtube-video-bot@users.noreply.github.com"
+          git add database/agent.db input/prompts.xlsx
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: save automated video progress"
+            git push
+          fi

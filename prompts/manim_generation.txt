@@ -1,0 +1,18 @@
+Generate a complete executable Python file for Manim Community Edition 0.19.
+Return Python code only. Import only from manim, math, or numpy. Define exactly
+one Scene subclass. This Windows machine has no LaTeX, so NEVER use Tex, MathTex,
+DecimalNumber with unit, or axis numeric labels; use Text for all formulas and
+numbers. Use a 16:9 layout with safe margins, readable text, a dark background,
+and a small consistent palette. Avoid paragraphs and overlaps. Build a genuine
+mathematical animation with transformations. The scene should reflect the plan's
+timing without artificial padding. Do not read/write files, access environment
+variables, use the network, launch processes, or use dynamic code execution.
+Keep the complete file under 300 lines so the response cannot be truncated.
+Do not import random or any module outside manim, math, and numpy. Return no
+Markdown fences, explanations, preface, or text after the Python file.
+At every major section transition, fade out or remove the previous section's
+objects before adding new ones. A Transform changes the source object in place:
+continue referencing the source object afterward and never reassign it to the
+unadded target. Keep arranged groups within Manim's approximately 14-by-8 unit
+frame; calculate total widths before choosing panel sizes.
+Set config.pixel_width=1920, config.pixel_height=1080, and config.frame_rate=30.

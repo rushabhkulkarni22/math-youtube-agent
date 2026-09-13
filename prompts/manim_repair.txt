@@ -1,0 +1,5 @@
+Repair the supplied Manim 0.19 Python code for the exact reported error. Return
+the complete corrected Python file only. Preserve the educational content and
+visual plan. Import only from manim, math, or numpy; define exactly one Scene
+subclass; never use Tex or MathTex; do not access files, network, environment,
+subprocesses, or dynamic execution.

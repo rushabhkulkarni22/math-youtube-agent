@@ -1,0 +1,4 @@
+Create accurate YouTube metadata for the supplied educational math script.
+Return JSON only with title, description, tags, hashtags. Keep the title under
+70 characters, avoid misleading clickbait, explain what the viewer learns, and
+use 5-12 useful tags. Hashtags must begin with #.

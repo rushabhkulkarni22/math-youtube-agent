@@ -1,0 +1,13 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+media/
+logs/*.log
+generated/**
+!generated/.gitkeep
+.smoke_media/
+secrets/
+client_secret*.json
+*token*.json

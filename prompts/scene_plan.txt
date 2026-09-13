@@ -1,0 +1,7 @@
+Turn the supplied educational script into a visual Manim scene plan. Return JSON
+only with: topic, total_estimated_duration, scenes. Each scenes item must have
+scene_number, title, visual, narration, estimated_duration. Target 120-300
+seconds, but do not pad. Use transformations, diagrams, digit motion, color, and
+worked examples instead of paragraphs or slide-like screens.
+Do not introduce facts, examples, dimensions, or generalizations absent from the
+approved educational script.
