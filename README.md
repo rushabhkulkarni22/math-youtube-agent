@@ -150,9 +150,10 @@ repository concurrency and the local active-run check prevent overlapping runs.
 `database/agent.db` and `input/prompts.xlsx` preserve progress between runners.
 Videos, logs, OAuth files, and API keys are excluded from Git.
 
-A failed candidate makes the workflow red and immediately queues the next Excel
-prompt. After a green run, the Windows trigger enforces a minimum 60-minute gap
-before another normal run can start.
+Groq rate limits are handled inside the same job, including waiting for a daily
+quota reset. Failed workflows do not create chained runs. The Windows trigger
+checks every 15 minutes, while still enforcing a minimum 60-minute gap after a
+green run.
 
 Install or repair the hourly Windows trigger with:
 

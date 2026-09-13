@@ -1,4 +1,8 @@
-param([switch]$Install, [switch]$RunSoon)
+param(
+    [switch]$Install,
+    [switch]$RunSoon,
+    [ValidateRange(5, 1440)][int]$CheckIntervalMinutes = 15
+)
 
 $ErrorActionPreference = "Stop"
 $TaskName = "Math YouTube Agent - Hourly Cloud Upload"
@@ -21,7 +25,7 @@ if ($Install) {
         -WorkingDirectory $PSScriptRoot
     $trigger = New-ScheduledTaskTrigger `
         -Once -At $nextHour `
-        -RepetitionInterval (New-TimeSpan -Hours 1)
+        -RepetitionInterval (New-TimeSpan -Minutes $CheckIntervalMinutes)
     $settings = New-ScheduledTaskSettingsSet `
         -WakeToRun `
         -StartWhenAvailable `
@@ -34,7 +38,7 @@ if ($Install) {
         -Settings $settings `
         -Description "Dispatch one private mathematical YouTube video cloud job every hour." `
         -Force | Out-Null
-    Write-Host "Installed '$TaskName'. First trigger: $nextHour"
+    Write-Host "Installed '$TaskName'. First trigger: $nextHour; check interval: $CheckIntervalMinutes minutes"
     exit 0
 }
 

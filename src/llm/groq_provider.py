@@ -17,7 +17,7 @@ class GroqProvider(LLMProvider):
     def _complete(
         self, system_prompt: str, user_prompt: str, max_completion_tokens: int = 12000
     ) -> str:
-        for attempt in range(5):
+        for attempt in range(6):
             try:
                 response = self.client.chat.completions.create(
                     model=self.model,
@@ -30,10 +30,22 @@ class GroqProvider(LLMProvider):
                 )
                 break
             except RateLimitError as exc:
-                if attempt == 4:
+                if attempt == 5:
                     raise
-                match = re.search(r"try again in ([0-9.]+)s", str(exc), re.I)
-                delay = float(match.group(1)) + 1 if match else min(30, 5 * (2**attempt))
+                match = re.search(
+                    r"try again in (?:(?P<minutes>[0-9.]+)m)?(?P<seconds>[0-9.]+)s",
+                    str(exc),
+                    re.I,
+                )
+                if match:
+                    delay = (
+                        float(match.group("minutes") or 0) * 60
+                        + float(match.group("seconds"))
+                        + 2
+                    )
+                else:
+                    delay = min(300, 10 * (2**attempt))
+                delay = min(delay, 1800)
                 time.sleep(delay)
         return (response.choices[0].message.content or "").strip()
 
