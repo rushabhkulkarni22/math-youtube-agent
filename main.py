@@ -47,7 +47,11 @@ def main() -> int:
         prompt = database.get_prompt(prompt_id)
     elif args.prompt_id:
         prompt = database.get_prompt(args.prompt_id)
-    provider = GroqProvider(settings.groq_api_key, settings.llm_model)
+    provider = GroqProvider(
+        settings.groq_api_key,
+        settings.llm_model,
+        settings.llm_fallback_models,
+    )
     pipeline = AutomatedVideoPipeline(settings, provider, logger)
     if args.topic or args.prompt_id:
         if not prompt:

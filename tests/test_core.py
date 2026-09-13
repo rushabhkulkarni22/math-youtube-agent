@@ -1,11 +1,13 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import Mock
 
 from openpyxl import Workbook
 
 from src.database import StateDatabase
 from src.manim_validator import validate_code
+from src.llm.groq_provider import GroqProvider
 from src.prompt_manager import PromptManager
 
 
@@ -37,6 +39,11 @@ class CoreTests(unittest.TestCase):
     def test_unsafe_code_is_rejected(self):
         with self.assertRaises(ValueError):
             validate_code("import subprocess\nfrom manim import *\nclass X(Scene): pass")
+
+    def test_groq_retry_delay_parses_minutes_and_seconds(self):
+        error = Mock()
+        error.__str__ = Mock(return_value="try again in 23m50.5s")
+        self.assertAlmostEqual(GroqProvider._retry_delay(error, 0), 1432.5)
 
 
 if __name__ == "__main__":

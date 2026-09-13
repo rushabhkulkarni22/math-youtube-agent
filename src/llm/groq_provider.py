@@ -8,56 +8,93 @@ from src.llm.base import LLMProvider
 
 
 class GroqProvider(LLMProvider):
-    def __init__(self, api_key: str, model: str):
+    def __init__(self, api_key: str, model: str, fallback_models: str = ""):
         if not api_key:
             raise ValueError("GROQ_API_KEY is missing. Add it to .env.")
         self.client = Groq(api_key=api_key)
-        self.model = model
+        self.models = list(
+            dict.fromkeys(
+                [model]
+                + [item.strip() for item in fallback_models.split(",") if item.strip()]
+            )
+        )
+        self.unavailable_models: set[str] = set()
+
+    @staticmethod
+    def _retry_delay(exc: RateLimitError, attempt: int) -> float:
+        match = re.search(
+            r"try again in (?:(?P<hours>[0-9.]+)h)?"
+            r"(?:(?P<minutes>[0-9.]+)m)?(?P<seconds>[0-9.]+)s",
+            str(exc),
+            re.I,
+        )
+        if match:
+            return (
+                float(match.group("hours") or 0) * 3600
+                + float(match.group("minutes") or 0) * 60
+                + float(match.group("seconds"))
+                + 2
+            )
+        return min(60, 5 * (2**attempt))
 
     def _complete(
         self, system_prompt: str, user_prompt: str, max_completion_tokens: int = 12000
     ) -> str:
-        for attempt in range(6):
-            try:
-                response = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt},
-                    ],
-                    temperature=0.2,
-                    max_completion_tokens=max_completion_tokens,
-                )
-                break
-            except RateLimitError as exc:
-                if attempt == 5:
-                    raise
-                match = re.search(
-                    r"try again in (?:(?P<minutes>[0-9.]+)m)?(?P<seconds>[0-9.]+)s",
-                    str(exc),
-                    re.I,
-                )
-                if match:
-                    delay = (
-                        float(match.group("minutes") or 0) * 60
-                        + float(match.group("seconds"))
-                        + 2
+        last_error: RateLimitError | None = None
+        for model in self.models:
+            if model in self.unavailable_models:
+                continue
+            for attempt in range(4):
+                try:
+                    request = {
+                        "model": model,
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt},
+                        ],
+                        "temperature": 0.2,
+                        "max_completion_tokens": max_completion_tokens,
+                    }
+                    if model.startswith("openai/gpt-oss-"):
+                        request["reasoning_effort"] = "low"
+                    response = self.client.chat.completions.create(**request)
+                    print(f"LLM request completed with {model}.", flush=True)
+                    return (response.choices[0].message.content or "").strip()
+                except RateLimitError as exc:
+                    last_error = exc
+                    delay = self._retry_delay(exc, attempt)
+                    # A long retry is normally a daily quota. Move immediately
+                    # to another model instead of holding the runner idle.
+                    if delay > 120:
+                        self.unavailable_models.add(model)
+                        print(
+                            f"{model} is quota-limited for about {delay:.0f}s; "
+                            "switching to the next model.",
+                            flush=True,
+                        )
+                        break
+                    if attempt == 3:
+                        print(f"{model} remains rate-limited; trying fallback.", flush=True)
+                        break
+                    print(
+                        f"{model} rate-limited; retrying in {delay:.0f}s "
+                        f"(attempt {attempt + 2}/4).",
+                        flush=True,
                     )
-                else:
-                    delay = min(300, 10 * (2**attempt))
-                delay = min(delay, 1800)
-                time.sleep(delay)
-        return (response.choices[0].message.content or "").strip()
+                    time.sleep(delay)
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError("No Groq model is available.")
 
     def generate_json(self, system_prompt: str, user_prompt: str) -> dict:
-        content = self._complete(system_prompt, user_prompt)
+        content = self._complete(system_prompt, user_prompt, 4500)
         fenced = re.fullmatch(r"```(?:json)?\s*(.*?)\s*```", content, re.DOTALL)
         return json.loads(fenced.group(1) if fenced else content)
 
     def generate_code(self, system_prompt: str, user_prompt: str) -> str:
         # Repairs include the previous complete source file, so reserve a
         # smaller completion budget to remain below Groq's free-tier TPM cap.
-        completion_limit = 2500 if system_prompt.lstrip().startswith("Repair") else 12000
+        completion_limit = 2500 if system_prompt.lstrip().startswith("Repair") else 7000
         content = self._complete(system_prompt, user_prompt, completion_limit)
         fenced = re.search(r"```(?:python)?\s*(.*?)(?:```|\Z)", content, re.DOTALL)
         return (fenced.group(1) if fenced else content).strip()

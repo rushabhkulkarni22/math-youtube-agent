@@ -11,7 +11,10 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=ROOT_DIR / ".env", extra="ignore")
 
     llm_provider: str = "groq"
-    llm_model: str = "openai/gpt-oss-120b"
+    # The 20B model is fast enough for the structured pipeline and has a
+    # separate quota bucket from the previously exhausted 120B model.
+    llm_model: str = "openai/gpt-oss-20b"
+    llm_fallback_models: str = "qwen/qwen3.6-27b,openai/gpt-oss-120b"
     groq_api_key: str = ""
     videos_per_day: int = Field(default=1, ge=1, le=15)
     dry_run: bool = True

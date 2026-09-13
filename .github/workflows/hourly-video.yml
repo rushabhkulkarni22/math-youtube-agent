@@ -16,6 +16,8 @@ jobs:
     timeout-minutes: 55
     env:
       GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      LLM_MODEL: openai/gpt-oss-20b
+      LLM_FALLBACK_MODELS: qwen/qwen3.6-27b,openai/gpt-oss-120b
       DRY_RUN: "false"
       YOUTUBE_PRIVACY: private
       VIDEOS_PER_DAY: "1"
