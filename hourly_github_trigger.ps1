@@ -1,4 +1,4 @@
-param([switch]$Install)
+param([switch]$Install, [switch]$RunSoon)
 
 $ErrorActionPreference = "Stop"
 $TaskName = "Math YouTube Agent - Hourly Cloud Upload"
@@ -6,9 +6,15 @@ $Repository = "rushabhkulkarni22/math-youtube-agent"
 $Workflow = "hourly-video.yml"
 $ScriptPath = $MyInvocation.MyCommand.Path
 $LogPath = Join-Path $PSScriptRoot "logs\hourly-trigger.log"
+$ForceMarker = Join-Path $PSScriptRoot "logs\force-next-trigger.marker"
 
 if ($Install) {
-    $nextHour = (Get-Date).Date.AddHours((Get-Date).Hour + 1)
+    $nextHour = if ($RunSoon) { (Get-Date).AddMinutes(1) } else {
+        (Get-Date).Date.AddHours((Get-Date).Hour + 1)
+    }
+    if ($RunSoon) {
+        New-Item -ItemType File -Path $ForceMarker -Force | Out-Null
+    }
     $action = New-ScheduledTaskAction `
         -Execute "powershell.exe" `
         -Argument "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File `"$ScriptPath`"" `
@@ -66,11 +72,15 @@ if ($activeRuns -gt 0) {
     exit 0
 }
 
+$forceThisRun = Test-Path $ForceMarker
+if ($forceThisRun) {
+    Remove-Item -LiteralPath $ForceMarker -Force
+}
 $latestGreen = $runs |
     Where-Object { $_.status -eq "completed" -and $_.conclusion -eq "success" } |
     Sort-Object { [datetime]$_.updatedAt } -Descending |
     Select-Object -First 1
-if ($latestGreen) {
+if ($latestGreen -and -not $forceThisRun) {
     $greenAge = (Get-Date).ToUniversalTime() - ([datetime]$latestGreen.updatedAt).ToUniversalTime()
     if ($greenAge.TotalMinutes -lt 60) {
         $remaining = [math]::Ceiling(60 - $greenAge.TotalMinutes)
