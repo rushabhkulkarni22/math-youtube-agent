@@ -45,6 +45,14 @@ class CoreTests(unittest.TestCase):
         error.__str__ = Mock(return_value="try again in 23m50.5s")
         self.assertAlmostEqual(GroqProvider._retry_delay(error, 0), 1432.5)
 
+    def test_groq_provider_requests_native_json_mode(self):
+        provider = object.__new__(GroqProvider)
+        provider._complete = Mock(return_value='{"answer": 42}')
+        self.assertEqual(provider.generate_json("system", "user"), {"answer": 42})
+        provider._complete.assert_called_once_with(
+            "system", "user", 4500, json_mode=True
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

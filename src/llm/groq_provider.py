@@ -38,7 +38,11 @@ class GroqProvider(LLMProvider):
         return min(60, 5 * (2**attempt))
 
     def _complete(
-        self, system_prompt: str, user_prompt: str, max_completion_tokens: int = 12000
+        self,
+        system_prompt: str,
+        user_prompt: str,
+        max_completion_tokens: int = 12000,
+        json_mode: bool = False,
     ) -> str:
         last_error: RateLimitError | None = None
         for model in self.models:
@@ -57,6 +61,8 @@ class GroqProvider(LLMProvider):
                     }
                     if model.startswith("openai/gpt-oss-"):
                         request["reasoning_effort"] = "low"
+                    if json_mode:
+                        request["response_format"] = {"type": "json_object"}
                     response = self.client.chat.completions.create(**request)
                     print(f"LLM request completed with {model}.", flush=True)
                     return (response.choices[0].message.content or "").strip()
@@ -87,9 +93,27 @@ class GroqProvider(LLMProvider):
         raise RuntimeError("No Groq model is available.")
 
     def generate_json(self, system_prompt: str, user_prompt: str) -> dict:
-        content = self._complete(system_prompt, user_prompt, 4500)
-        fenced = re.fullmatch(r"```(?:json)?\s*(.*?)\s*```", content, re.DOTALL)
-        return json.loads(fenced.group(1) if fenced else content)
+        parse_error: json.JSONDecodeError | None = None
+        for attempt in range(2):
+            prompt = user_prompt
+            if attempt:
+                prompt += (
+                    "\n\nReturn strict JSON only. Escape every backslash inside JSON "
+                    "strings (for example, write \\\\theta rather than \\theta)."
+                )
+            content = self._complete(system_prompt, prompt, 4500, json_mode=True)
+            fenced = re.fullmatch(r"```(?:json)?\s*(.*?)\s*```", content, re.DOTALL)
+            try:
+                return json.loads(fenced.group(1) if fenced else content)
+            except json.JSONDecodeError as exc:
+                parse_error = exc
+                print(
+                    f"Model returned invalid JSON; retrying ({exc.msg} at character "
+                    f"{exc.pos}).",
+                    flush=True,
+                )
+        assert parse_error is not None
+        raise parse_error
 
     def generate_code(self, system_prompt: str, user_prompt: str) -> str:
         # Repairs include the previous complete source file, so reserve a
