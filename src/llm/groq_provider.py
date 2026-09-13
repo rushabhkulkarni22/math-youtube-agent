@@ -13,7 +13,9 @@ class GroqProvider(LLMProvider):
         self.client = Groq(api_key=api_key)
         self.model = model
 
-    def _complete(self, system_prompt: str, user_prompt: str) -> str:
+    def _complete(
+        self, system_prompt: str, user_prompt: str, max_completion_tokens: int = 12000
+    ) -> str:
         response = self.client.chat.completions.create(
             model=self.model,
             messages=[
@@ -21,7 +23,7 @@ class GroqProvider(LLMProvider):
                 {"role": "user", "content": user_prompt},
             ],
             temperature=0.2,
-            max_completion_tokens=12000,
+            max_completion_tokens=max_completion_tokens,
         )
         return (response.choices[0].message.content or "").strip()
 
@@ -31,6 +33,9 @@ class GroqProvider(LLMProvider):
         return json.loads(fenced.group(1) if fenced else content)
 
     def generate_code(self, system_prompt: str, user_prompt: str) -> str:
-        content = self._complete(system_prompt, user_prompt)
+        # Repairs include the previous complete source file, so reserve a
+        # smaller completion budget to remain below Groq's free-tier TPM cap.
+        completion_limit = 2500 if system_prompt.lstrip().startswith("Repair") else 12000
+        content = self._complete(system_prompt, user_prompt, completion_limit)
         fenced = re.search(r"```(?:python)?\s*(.*?)(?:```|\Z)", content, re.DOTALL)
         return (fenced.group(1) if fenced else content).strip()
