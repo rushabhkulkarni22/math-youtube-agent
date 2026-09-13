@@ -1,7 +1,8 @@
 import json
 import re
+import time
 
-from groq import Groq
+from groq import Groq, RateLimitError
 
 from src.llm.base import LLMProvider
 
@@ -16,15 +17,24 @@ class GroqProvider(LLMProvider):
     def _complete(
         self, system_prompt: str, user_prompt: str, max_completion_tokens: int = 12000
     ) -> str:
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=0.2,
-            max_completion_tokens=max_completion_tokens,
-        )
+        for attempt in range(5):
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt},
+                    ],
+                    temperature=0.2,
+                    max_completion_tokens=max_completion_tokens,
+                )
+                break
+            except RateLimitError as exc:
+                if attempt == 4:
+                    raise
+                match = re.search(r"try again in ([0-9.]+)s", str(exc), re.I)
+                delay = float(match.group(1)) + 1 if match else min(30, 5 * (2**attempt))
+                time.sleep(delay)
         return (response.choices[0].message.content or "").strip()
 
     def generate_json(self, system_prompt: str, user_prompt: str) -> dict:

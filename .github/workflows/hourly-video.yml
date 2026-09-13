@@ -2,6 +2,11 @@ name: Generate and upload one YouTube video
 
 on:
   workflow_dispatch:
+    inputs:
+      retry_depth:
+        description: "Automatic retry-chain depth"
+        required: false
+        default: "0"
 
 permissions:
   contents: write
@@ -64,9 +69,10 @@ jobs:
           fi
 
       - name: Immediately queue the next prompt after failure
-        if: failure()
+        if: failure() && fromJSON(inputs.retry_depth || '0') < 2
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           sleep 10
-          gh workflow run hourly-video.yml --ref main
+          next_depth=$(( ${{ inputs.retry_depth || '0' }} + 1 ))
+          gh workflow run hourly-video.yml --ref main -f retry_depth="$next_depth"
