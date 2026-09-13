@@ -50,17 +50,18 @@ if (-not $gh) {
     exit 1
 }
 
-$activeRuns = & $gh run list `
+$runsJson = & $gh run list `
     --repo $Repository `
     --workflow $Workflow `
     --limit 10 `
-    --json status `
-    --jq '[.[] | select(.status == "queued" or .status == "in_progress")] | length'
+    --json status
 if ($LASTEXITCODE -ne 0) {
     Add-Content $LogPath "$timestamp ERROR: Unable to query GitHub workflow status."
     exit $LASTEXITCODE
 }
-if ([int]$activeRuns -gt 0) {
+$runs = $runsJson | ConvertFrom-Json
+$activeRuns = @($runs | Where-Object { $_.status -in @("queued", "in_progress") }).Count
+if ($activeRuns -gt 0) {
     Add-Content $LogPath "$timestamp SKIPPED: A cloud workflow is already active."
     exit 0
 }
