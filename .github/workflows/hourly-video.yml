@@ -2,7 +2,10 @@ name: Generate and upload one YouTube video
 
 on:
   schedule:
-    - cron: "17 * * * *"
+    # GitHub cron is best-effort and can drop an individual event. Triggering
+    # redundant checks makes the schedule self-healing; the gate below still
+    # permits at most one real video attempt in a 50-minute window.
+    - cron: "7,17,27,37,47,57 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -26,12 +29,31 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Enforce hourly cadence
+        id: cadence
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "run_video=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          last_change="$(git log -1 --format=%ct -- database/agent.db 2>/dev/null || echo 0)"
+          now="$(date +%s)"
+          if (( now - last_change >= 3000 )); then
+            echo "run_video=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run_video=false" >> "$GITHUB_OUTPUT"
+            echo "A video attempt ran within the last 50 minutes; skipping this redundant trigger."
+          fi
+
       - uses: actions/setup-python@v6
+        if: steps.cadence.outputs.run_video == 'true'
         with:
           python-version: "3.11"
           cache: pip
 
       - name: Install Manim and video dependencies
+        if: steps.cadence.outputs.run_video == 'true'
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -42,6 +64,7 @@ jobs:
           python -m pip install -r requirements.txt
 
       - name: Restore encrypted application credentials
+        if: steps.cadence.outputs.run_video == 'true'
         env:
           YOUTUBE_CLIENT_SECRET_JSON: ${{ secrets.YOUTUBE_CLIENT_SECRET_JSON }}
           YOUTUBE_TOKEN_JSON: ${{ secrets.YOUTUBE_TOKEN_JSON }}
@@ -51,10 +74,11 @@ jobs:
           printf '%s' "$YOUTUBE_TOKEN_JSON" > secrets/youtube_token.json
 
       - name: Generate and upload one private video
+        if: steps.cadence.outputs.run_video == 'true'
         run: python main.py --limit 1
 
       - name: Save upload progress
-        if: always()
+        if: always() && steps.cadence.outputs.run_video == 'true'
         run: |
           git config user.name "youtube-video-bot"
           git config user.email "youtube-video-bot@users.noreply.github.com"

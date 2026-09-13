@@ -143,7 +143,8 @@ uv run python main.py --retry-failed --limit 1
 ## Always-on hourly deployment
 
 The GitHub Actions workflow in `.github/workflows/hourly-video.yml` generates
-and uploads one private video every hour (at minute 17). It can also be started
+and uploads at most one private video per hour. Redundant ten-minute scheduler
+checks compensate for delayed or dropped GitHub cron events. It can also be started
 manually from the repository's Actions page. GitHub repository concurrency
 prevents overlapping runs, while `database/agent.db` and `input/prompts.xlsx`
 preserve upload progress between runners. Videos, logs, OAuth files, and API
