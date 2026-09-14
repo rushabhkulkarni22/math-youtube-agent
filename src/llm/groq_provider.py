@@ -80,6 +80,7 @@ class GroqProvider(LLMProvider):
                         )
                         break
                     if attempt == 3:
+                        self.unavailable_models.add(model)
                         print(f"{model} remains rate-limited; trying fallback.", flush=True)
                         break
                     print(
