@@ -68,13 +68,15 @@ def main() -> int:
     limit = min(args.limit, settings.videos_per_day)
     attempts = 0
     successes = 0
+    attempted_ids: set[int] = set()
     max_attempts = args.max_prompt_attempts or limit
     while successes < limit and attempts < max_attempts:
-        prompt = database.next_actionable()
+        prompt = database.next_actionable(attempted_ids)
         if not prompt:
             logger.info("No actionable prompts remain")
             break
         attempts += 1
+        attempted_ids.add(int(prompt["id"]))
         try:
             pipeline.process(prompt)
             successes += 1

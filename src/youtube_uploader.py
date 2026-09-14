@@ -1,5 +1,7 @@
 import random
+import re
 import time
+import unicodedata
 from pathlib import Path
 
 from google.auth.transport.requests import Request
@@ -14,6 +16,18 @@ from src.models import VideoMetadata
 
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 RETRIABLE_CODES = {500, 502, 503, 504}
+
+
+def sanitize_description(description: str) -> str:
+    """Keep generated text inside YouTube's description constraints."""
+    text = "".join(
+        character
+        for character in description
+        if character in "\n\t" or unicodedata.category(character) != "Cc"
+    )
+    # YouTube rejects angle brackets because they can resemble unsupported HTML.
+    text = re.sub(r"[<>]", "", text).strip()
+    return text[:4900]
 
 
 def authorize(client_secret: Path, token_file: Path) -> Credentials:
@@ -36,7 +50,12 @@ def upload_video(video: Path, thumbnail: Path, metadata: VideoMetadata, privacy:
     request = youtube.videos().insert(
         part="snippet,status",
         body={
-            "snippet": {"title": metadata.title, "description": metadata.description, "tags": metadata.tags, "categoryId": "27"},
+            "snippet": {
+                "title": metadata.title[:100],
+                "description": sanitize_description(metadata.description),
+                "tags": metadata.tags,
+                "categoryId": "27",
+            },
             "status": {"privacyStatus": privacy, "selfDeclaredMadeForKids": False, "containsSyntheticMedia": True},
         },
         media_body=MediaFileUpload(str(video), chunksize=8 * 1024 * 1024, resumable=True),

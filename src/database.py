@@ -116,15 +116,24 @@ class StateDatabase:
             ).fetchone()
         return dict(row) if row else None
 
-    def next_actionable(self) -> dict | None:
+    def next_actionable(self, exclude_ids: set[int] | None = None) -> dict | None:
+        exclude_ids = exclude_ids or set()
+        exclusion = ""
+        parameters: tuple[int, ...] = ()
+        if exclude_ids:
+            placeholders = ",".join("?" for _ in exclude_ids)
+            exclusion = f" AND id NOT IN ({placeholders})"
+            parameters = tuple(sorted(exclude_ids))
         with closing(sqlite3.connect(self.path)) as connection:
             connection.row_factory = sqlite3.Row
             row = connection.execute(
-                """SELECT * FROM prompts
+                f"""SELECT * FROM prompts
                    WHERE status IN ('PENDING','SCRIPT_GENERATED','MANIM_GENERATED',
                                     'RENDERED','AUDIO_GENERATED','READY_TO_UPLOAD')
+                   {exclusion}
                    ORDER BY CASE status WHEN 'READY_TO_UPLOAD' THEN 0 ELSE 1 END, id
-                   LIMIT 1"""
+                   LIMIT 1""",
+                parameters,
             ).fetchone()
         return dict(row) if row else None
 

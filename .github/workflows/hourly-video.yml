@@ -61,5 +61,6 @@ jobs:
           git add database/agent.db input/prompts.xlsx
           if ! git diff --cached --quiet; then
             git commit -m "chore: save automated video progress"
+            git pull --rebase origin main
             git push
           fi

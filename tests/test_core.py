@@ -10,6 +10,7 @@ from src.database import StateDatabase
 from src.manim_validator import validate_code
 from src.llm.groq_provider import GroqProvider
 from src.prompt_manager import PromptManager
+from src.youtube_uploader import sanitize_description
 
 
 class CoreTests(unittest.TestCase):
@@ -33,6 +34,13 @@ class CoreTests(unittest.TestCase):
             second = database.add_topic("  kaprekar   6174 ")
             self.assertEqual(first, second)
 
+    def test_actionable_prompt_can_exclude_failed_attempt_in_same_run(self):
+        with tempfile.TemporaryDirectory() as directory:
+            database = StateDatabase(Path(directory) / "state.db")
+            first = database.add_topic("First topic")
+            second = database.add_topic("Second topic")
+            self.assertEqual(database.next_actionable({first})["id"], second)
+
     def test_safe_scene_is_accepted(self):
         code = "from manim import *\nclass Demo(Scene):\n def construct(self):\n  self.add(Text('safe'))"
         self.assertEqual(validate_code(code), "Demo")
@@ -40,6 +48,14 @@ class CoreTests(unittest.TestCase):
     def test_unsafe_code_is_rejected(self):
         with self.assertRaises(ValueError):
             validate_code("import subprocess\nfrom manim import *\nclass X(Scene): pass")
+
+    def test_youtube_description_is_sanitized(self):
+        unsafe = "Proof <script>\x00" + ("x" * 6000)
+        cleaned = sanitize_description(unsafe)
+        self.assertNotIn("<", cleaned)
+        self.assertNotIn(">", cleaned)
+        self.assertNotIn("\x00", cleaned)
+        self.assertLessEqual(len(cleaned), 4900)
 
     def test_groq_retry_delay_parses_minutes_and_seconds(self):
         error = Mock()
