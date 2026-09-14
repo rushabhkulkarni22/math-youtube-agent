@@ -143,19 +143,20 @@ uv run python main.py --retry-failed --limit 1
 ## Always-on hourly deployment
 
 The GitHub Actions workflow in `.github/workflows/hourly-video.yml` generates
-and uploads one private video when dispatched. The local
-`hourly_github_trigger.ps1` is installed in Windows Task Scheduler and dispatches
-the cloud workflow hourly, including waking the computer from sleep. GitHub
-repository concurrency and the local active-run check prevent overlapping runs.
+and uploads one private video every hour using GitHub's cloud scheduler. It does
+not depend on the local computer being awake or powered on. The local
+`hourly_github_trigger.ps1` is retained only as a manual fallback and should not
+be enabled alongside the cloud schedule. GitHub repository concurrency prevents
+overlapping runs.
 `database/agent.db` and `input/prompts.xlsx` preserve progress between runners.
 Videos, logs, OAuth files, and API keys are excluded from Git.
 
 Groq rate limits are handled inside the same job, including waiting for a daily
-quota reset. Failed workflows do not create chained runs. The Windows trigger
-checks every 5 minutes, while still enforcing a minimum 60-minute gap after a
-green run.
+quota reset. Failed workflows do not create chained runs. The cloud schedule
+runs at 19 minutes past every hour in India (49 minutes past UTC). GitHub can
+occasionally delay scheduled jobs by a few minutes during high load.
 
-Install or repair the hourly Windows trigger with:
+The Windows fallback can be installed manually with:
 
 ```powershell
 .\hourly_github_trigger.ps1 -Install

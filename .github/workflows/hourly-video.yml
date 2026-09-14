@@ -2,6 +2,9 @@ name: Generate and upload one YouTube video
 
 on:
   workflow_dispatch:
+  schedule:
+    # 49 minutes past UTC = 19 minutes past the hour in India (UTC+05:30).
+    - cron: "49 * * * *"
 
 permissions:
   contents: write
