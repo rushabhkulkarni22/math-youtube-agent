@@ -152,7 +152,7 @@ Videos, logs, OAuth files, and API keys are excluded from Git.
 
 Groq rate limits are handled inside the same job, including waiting for a daily
 quota reset. Failed workflows do not create chained runs. The Windows trigger
-checks every 15 minutes, while still enforcing a minimum 60-minute gap after a
+checks every 5 minutes, while still enforcing a minimum 60-minute gap after a
 green run.
 
 Install or repair the hourly Windows trigger with:

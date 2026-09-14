@@ -1,7 +1,7 @@
 param(
     [switch]$Install,
     [switch]$RunSoon,
-    [ValidateRange(5, 1440)][int]$CheckIntervalMinutes = 15
+    [ValidateRange(5, 1440)][int]$CheckIntervalMinutes = 5
 )
 
 $ErrorActionPreference = "Stop"
