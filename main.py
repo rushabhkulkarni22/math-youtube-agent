@@ -15,12 +15,18 @@ def parse_args() -> argparse.Namespace:
     group.add_argument("--prompt-id", type=int)
     group.add_argument("--topic")
     parser.add_argument("--limit", type=int, default=1)
+    parser.add_argument(
+        "--max-prompt-attempts",
+        type=int,
+        default=None,
+        help="Maximum prompts to try while seeking the requested successful uploads.",
+    )
     parser.add_argument("--retry-failed", action="store_true")
     parser.add_argument("--authorize-youtube", action="store_true")
     parser.add_argument(
         "--fail-on-item-error",
         action="store_true",
-        help="Return a failing exit code if any selected prompt fails.",
+        help="Return a failing exit code if no selected prompt succeeds.",
     )
     return parser.parse_args()
 
@@ -60,18 +66,27 @@ def main() -> int:
         return 0
 
     limit = min(args.limit, settings.videos_per_day)
-    had_failure = False
-    for _ in range(limit):
+    attempts = 0
+    successes = 0
+    max_attempts = args.max_prompt_attempts or limit
+    while successes < limit and attempts < max_attempts:
         prompt = database.next_actionable()
         if not prompt:
             logger.info("No actionable prompts remain")
             break
+        attempts += 1
         try:
             pipeline.process(prompt)
+            successes += 1
         except Exception:
             logger.exception("Prompt %s failed; continuing batch", prompt["id"])
-            had_failure = True
-    return 1 if had_failure and args.fail_on_item_error else 0
+    if successes:
+        logger.info(
+            "Batch completed with %s successful upload(s) across %s prompt attempt(s)",
+            successes,
+            attempts,
+        )
+    return 1 if not successes and attempts and args.fail_on_item_error else 0
 
 
 if __name__ == "__main__":

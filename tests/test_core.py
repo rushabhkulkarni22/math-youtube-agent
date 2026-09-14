@@ -4,6 +4,7 @@ from pathlib import Path
 from unittest.mock import Mock
 
 from openpyxl import Workbook
+from groq import BadRequestError
 
 from src.database import StateDatabase
 from src.manim_validator import validate_code
@@ -52,6 +53,21 @@ class CoreTests(unittest.TestCase):
         provider._complete.assert_called_once_with(
             "system", "user", 4500, json_mode=True
         )
+
+    def test_invalid_native_json_is_retried(self):
+        provider = object.__new__(GroqProvider)
+        provider.client = Mock()
+        provider.models = ["openai/gpt-oss-20b"]
+        provider.unavailable_models = set()
+        bad = BadRequestError(
+            "json_validate_failed", response=Mock(status_code=400), body=None
+        )
+        provider.client.chat.completions.create.side_effect = [
+            bad,
+            Mock(choices=[Mock(message=Mock(content='{"answer": 42}'))]),
+        ]
+        self.assertEqual(provider.generate_json("system", "user"), {"answer": 42})
+        self.assertEqual(provider.client.chat.completions.create.call_count, 2)
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@ import json
 import re
 import time
 
-from groq import Groq, RateLimitError
+from groq import BadRequestError, Groq, RateLimitError
 
 from src.llm.base import LLMProvider
 
@@ -44,7 +44,7 @@ class GroqProvider(LLMProvider):
         max_completion_tokens: int = 12000,
         json_mode: bool = False,
     ) -> str:
-        last_error: RateLimitError | None = None
+        last_error: Exception | None = None
         for model in self.models:
             if model in self.unavailable_models:
                 continue
@@ -88,6 +88,26 @@ class GroqProvider(LLMProvider):
                         flush=True,
                     )
                     time.sleep(delay)
+                except BadRequestError as exc:
+                    last_error = exc
+                    if json_mode and "json_validate_failed" in str(exc):
+                        print(
+                            f"{model} produced invalid native JSON; "
+                            "retrying with a stricter prompt.",
+                            flush=True,
+                        )
+                        user_prompt += (
+                            "\nReturn one complete valid JSON object. Use plain-text "
+                            "math and do not use LaTeX backslash commands in strings."
+                        )
+                        if attempt < 3:
+                            continue
+                        print(
+                            f"{model} repeatedly produced invalid JSON; trying fallback.",
+                            flush=True,
+                        )
+                        break
+                    raise
         if last_error is not None:
             raise last_error
         raise RuntimeError("No Groq model is available.")
