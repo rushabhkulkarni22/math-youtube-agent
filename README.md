@@ -140,24 +140,20 @@ To retry failed items:
 uv run python main.py --retry-failed --limit 1
 ```
 
-## Always-on hourly deployment
+## Hourly local automation
 
-The GitHub Actions workflow in `.github/workflows/hourly-video.yml` generates
-and uploads one private video every hour using GitHub's cloud scheduler. It does
-not depend on the local computer being awake or powered on. The local
-`hourly_github_trigger.ps1` is retained only as a manual fallback and should not
-be enabled alongside the cloud schedule. GitHub repository concurrency prevents
-overlapping runs.
+`hourly_local_upload.ps1` runs the complete pipeline directly on this computer.
+Windows Task Scheduler starts it hourly, wakes the computer when supported, and
+retries a failed execution up to three times at five-minute intervals. A lock
+file prevents overlapping uploads.
 `database/agent.db` and `input/prompts.xlsx` preserve progress between runners.
 Videos, logs, OAuth files, and API keys are excluded from Git.
 
 Groq rate limits are handled inside the same job, including waiting for a daily
-quota reset. Failed workflows do not create chained runs. The cloud schedule
-runs at 19 minutes past every hour in India (49 minutes past UTC). GitHub can
-occasionally delay scheduled jobs by a few minutes during high load.
+quota reset. GitHub Actions is not used for scheduling or execution.
 
-The Windows fallback can be installed manually with:
+Install or repair the direct hourly task with:
 
 ```powershell
-.\hourly_github_trigger.ps1 -Install
+powershell -ExecutionPolicy Bypass -File .\hourly_local_upload.ps1 -Install
 ```
