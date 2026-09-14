@@ -64,13 +64,32 @@ try {
     $env:YOUTUBE_PRIVACY = "private"
     $env:MANIM_QUALITY = "low_quality"
     $uv = (Get-Command uv -ErrorAction Stop).Source
+    $stdoutPath = Join-Path $LogDirectory "hourly-local-stdout.tmp"
+    $stderrPath = Join-Path $LogDirectory "hourly-local-stderr.tmp"
+    Remove-Item -LiteralPath $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
 
     Push-Location $ProjectRoot
     try {
-        & $uv run python main.py --limit 1 --max-prompt-attempts 3 --fail-on-item-error *>> $LogPath
-        if ($LASTEXITCODE -ne 0) { throw "Video pipeline exited with code $LASTEXITCODE" }
+        $process = Start-Process `
+            -FilePath $uv `
+            -ArgumentList @(
+                "run", "python", "main.py", "--limit", "1",
+                "--max-prompt-attempts", "3", "--fail-on-item-error"
+            ) `
+            -WorkingDirectory $ProjectRoot `
+            -RedirectStandardOutput $stdoutPath `
+            -RedirectStandardError $stderrPath `
+            -NoNewWindow `
+            -Wait `
+            -PassThru
+        if (Test-Path $stdoutPath) { Get-Content $stdoutPath | Add-Content $LogPath }
+        if (Test-Path $stderrPath) { Get-Content $stderrPath | Add-Content $LogPath }
+        if ($process.ExitCode -ne 0) {
+            throw "Video pipeline exited with code $($process.ExitCode)"
+        }
     } finally {
         Pop-Location
+        Remove-Item -LiteralPath $stdoutPath, $stderrPath -Force -ErrorAction SilentlyContinue
     }
     Add-Content $LogPath "$(Get-Date -Format s) SUCCEEDED"
     exit 0
